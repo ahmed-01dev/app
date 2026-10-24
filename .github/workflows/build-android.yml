@@ -1,8 +1,10 @@
+
 name: build-android
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -10,8 +12,10 @@ permissions:
 
 jobs:
   build:
-    timeout-minutes: 45
+    name: Build Fajr Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,37 +30,52 @@ jobs:
       - name: Show Flutter version
         run: flutter --version
 
-      # Generate Android platform files in the CI workspace if they are absent.
-      # This does not automatically commit generated files back to GitHub.
       - name: Generate Android platform files if missing
         shell: bash
         run: |
           if [[ ! -f android/app/build.gradle && ! -f android/app/build.gradle.kts ]]; then
-            echo "Android platform files are missing; generating them with Flutter..."
+            echo "Android files are missing. Generating Android platform..."
             flutter create --platforms=android --org com.fajr --project-name fajr .
           else
-            echo "Android platform files already exist."
+            echo "Android platform already exists."
           fi
-          test -f android/gradlew
+
+          if [[ ! -f android/gradlew ]]; then
+            echo "::error::Android Gradle wrapper was not generated."
+            exit 1
+          fi
+
           if [[ ! -f android/app/build.gradle && ! -f android/app/build.gradle.kts ]]; then
-            echo "::error::Flutter did not generate Android app Gradle files."
+            echo "::error::Android app Gradle file is missing."
             exit 1
           fi
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed .
+      - name: Format Dart files
+        run: dart format .
 
-      - name: Analyze
+      - name: Analyze Flutter project
         run: flutter analyze
 
-      - name: Tests
+      - name: Run tests
         run: flutter test
 
       - name: Build debug APK
         run: flutter build apk --debug
+
+      - name: Verify APK exists
+        shell: bash
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+
+          if [[ ! -f "$APK_PATH" ]]; then
+            echo "::error::APK was not generated."
+            exit 1
+          fi
+
+          ls -lh "$APK_PATH"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
