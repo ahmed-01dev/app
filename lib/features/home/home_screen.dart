@@ -49,7 +49,7 @@ class HomeScreen extends StatelessWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => PrayerTimesScreen(
+                  builder: (_) => const PrayerTimesScreen(
                     onCitySelected: _onCitySelected,
                   ),
                 ),
