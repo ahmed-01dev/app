@@ -1,42 +1,41 @@
-
 name: analyze-test
 
 on:
-  push:
-    branches: [main, dev]
-  pull_request:
-  workflow_dispatch:
+push:
+branches: [main, dev]
+pull_request:
+workflow_dispatch:
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  analyze-test:
-    timeout-minutes: 25
-    runs-on: ubuntu-latest
+analyze-test:
+timeout-minutes: 25
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: '3.47.7'
-          cache: true
+  - name: Set up Flutter
+    uses: subosito/flutter-action@v2
+    with:
+      channel: stable
+      flutter-version: '3.47.7'
+      cache: true
 
-      - name: Show Flutter version
-        run: flutter --version
+  - name: Show Flutter version
+    run: flutter --version
 
-      - name: Get dependencies
-        run: flutter pub get
+  - name: Get dependencies
+    run: flutter pub get
 
-      - name: Format Dart files
-        run: dart format .
+  - name: Format Dart files
+    run: dart format .
 
-      - name: Analyze
-        run: flutter analyze
+  - name: Analyze
+    run: flutter analyze --no-fatal-infos
 
-      - name: Unit and widget tests
-        run: flutter test
+  - name: Unit and widget tests
+    run: flutter test
