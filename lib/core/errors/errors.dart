@@ -1,20 +1,21 @@
+
 import 'dart:async';
 import 'dart:math';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-/// Typed application error. Raw exceptions are NEVER shown to users;
-/// they are logged and replaced by a short Arabic message.
+/// Typed application error. Raw exceptions are NEVER shown to users.
 class AppError implements Exception {
-  const AppError(this.code, {this.message, this.cause, this.stackTrace});
+  const AppError(
+    this.code, {
+    this.message,
+    this.cause,
+    this.stackTrace,
+  });
 
   final ErrorCode code;
-
-  /// Short, Arabic, user-facing message. Filled by ErrorMapper if omitted.
   final String? message;
-
-  /// Original technical exception — logged for diagnosis, never displayed.
   final Object? cause;
   final StackTrace? stackTrace;
 
@@ -71,21 +72,23 @@ enum ErrorCode {
   unexpected,
 }
 
-/// The recovery action offered in the UI for each error code.
 extension ErrorCodeActions on ErrorCode {
   ErrorAction get action => switch (this) {
         ErrorCode.network ||
         ErrorCode.dbTimeout ||
-        ErrorCode.firebaseUnavailable => ErrorAction.retry,
+        ErrorCode.firebaseUnavailable =>
+          ErrorAction.retry,
         ErrorCode.startupTimeout => ErrorAction.retryOrOffline,
         ErrorCode.sessionExpired ||
         ErrorCode.requiresReauth ||
-        ErrorCode.userDisabled => ErrorAction.signInAgain,
+        ErrorCode.userDisabled =>
+          ErrorAction.signInAgain,
         ErrorCode.notificationDenied ||
         ErrorCode.locationDenied ||
         ErrorCode.locationDisabled ||
         ErrorCode.exactAlarmUnavailable ||
-        ErrorCode.missingIndex => ErrorAction.openSettings,
+        ErrorCode.missingIndex =>
+          ErrorAction.openSettings,
         ErrorCode.corruptedPrefs ||
         ErrorCode.notFound ||
         ErrorCode.permissionDenied ||
@@ -95,7 +98,8 @@ extension ErrorCodeActions on ErrorCode {
         ErrorCode.rateLimited ||
         ErrorCode.invalidInput ||
         ErrorCode.selfRequest ||
-        ErrorCode.blocked => ErrorAction.editInput,
+        ErrorCode.blocked =>
+          ErrorAction.editInput,
         _ => ErrorAction.contactSupport,
       };
 }
@@ -109,102 +113,124 @@ enum ErrorAction {
   contactSupport,
 }
 
-/// Converts any exception into a typed [AppError] with an Arabic message.
 class ErrorMapper {
   const ErrorMapper._();
 
-  static const _arabicMessages = {
+  static const Map<ErrorCode, String> _arabicMessages = {
     ErrorCode.startupTimeout: 'استغرقت عملية التحميل وقتًا طويلًا.',
     ErrorCode.firebaseUnavailable: 'تعذّر الاتصال بالخدمات السحابية الآن.',
     ErrorCode.firebaseNotConfigured:
         'لم يتم ضبط Firebase بعد — يعمل التطبيق في الوضع المحلي.',
-    ErrorCode.corruptedPrefs: 'تالفة بيانات محفوظة — تمت إعادة ضبطها.',
+    ErrorCode.corruptedPrefs: 'بيانات محفوظة تالفة — اختر الإعدادات من جديد.',
     ErrorCode.invalidEmail: 'البريد الإلكتروني غير صحيح.',
     ErrorCode.weakPassword: 'كلمة المرور قصيرة جدًا (6 أحرف على الأقل).',
     ErrorCode.emailInUse: 'هذا البريد مسجّل مسبقًا.',
     ErrorCode.wrongCredentials: 'البريد أو كلمة المرور غير صحيحة.',
     ErrorCode.tooManyAttempts: 'محاولات كثيرة — انتظر قليلًا ثم أعد المحاولة.',
     ErrorCode.sessionExpired: 'انتهت صلاحية الجلسة — سجّل الدخول من جديد.',
-    ErrorCode.requiresReauth: 'لأمان حسابك، سجّل الدخول من جديد لإكمال الإجراء.',
+    ErrorCode.requiresReauth:
+        'لأمان حسابك، سجّل الدخول من جديد لإكمال الإجراء.',
     ErrorCode.userDisabled: 'هذا الحساب معطّل. تواصل مع الدعم.',
     ErrorCode.network: 'لا يوجد اتصال بالإنترنت.',
     ErrorCode.authCancelled: 'تم إلغاء عملية الدخول.',
     ErrorCode.permissionDenied: 'ليس لديك صلاحية لهذا الإجراء.',
     ErrorCode.notFound: 'العنصر المطلوب غير موجود.',
     ErrorCode.invalidData: 'البيانات غير صالحة.',
-    ErrorCode.missingIndex: 'الفهرس قيد الإنشاء على الخادم — أعد المحاولة لاحقًا.',
+    ErrorCode.missingIndex:
+        'الفهرس قيد الإنشاء على الخادم — أعد المحاولة لاحقًا.',
     ErrorCode.dbTimeout: 'انتهت مهلة الاتصال بقاعدة البيانات.',
-    ErrorCode.conflict: 'تم تنفيذ هذا الإجراء مسبقًا.',
+    ErrorCode.conflict: 'يتعارض هذا الإجراء مع بيانات موجودة.',
+    ErrorCode.invalidInput: 'تحقق من البيانات المدخلة.',
     ErrorCode.duplicateJoin: 'أنت عضو في هذا الفريق بالفعل.',
     ErrorCode.duplicateRequest: 'طلب مماثل قائم بالفعل.',
     ErrorCode.selfRequest: 'لا يمكنك إرسال طلب لنفسك.',
     ErrorCode.blocked: 'لا يمكن إكمال الطلب.',
     ErrorCode.rateLimited: 'طلبات كثيرة جدًا — انتظر دقيقة.',
-    ErrorCode.invalidInput: 'تحقق من البيانات المدخلة.',
+    ErrorCode.invalidPrayerTime:
+        'تعذّر حساب وقت الصلاة — تحقق من المدينة.',
     ErrorCode.duplicateEvent: 'تم تسجيل هذا الحدث مسبقًا.',
-    ErrorCode.invalidPrayerTime: 'تعذّر حساب وقت الصلاة — تحقق من الموقع.',
-    ErrorCode.dialerUnavailable: 'لا يمكن فتح تطبيق الاتصال.',
-    ErrorCode.locationDenied: 'إذن الموقع مرفوض — اختر مدينة يدويًا من الإعدادات.',
+    ErrorCode.unauthorized: 'يلزم تسجيل الدخول لتنفيذ هذا الإجراء.',
+    ErrorCode.notificationDenied: 'إذن الإشعارات غير متاح.',
+    ErrorCode.exactAlarmUnavailable:
+        'التنبيهات الدقيقة غير متاحة على هذا الجهاز.',
+    ErrorCode.locationDenied: 'إذن الموقع مرفوض — اختر مدينة يدويًا.',
     ErrorCode.locationDisabled: 'خدمة الموقع معطّلة — اختر مدينة يدويًا.',
-    ErrorCode.exactAlarmUnavailable: 'المُوقّت الدقيق غير متاح — سيتم استخدام تذكير تقريبي.',
+    ErrorCode.dialerUnavailable: 'لا يمكن فتح تطبيق الاتصال.',
     ErrorCode.unexpected: 'حدث خطأ غير متوقع. حاول مرة أخرى.',
   };
 
   static String userMessage(AppError error) =>
-      error.message ?? _arabicMessages[error.code] ?? _arabicMessages[ErrorCode.unexpected]!;
+      error.message ??
+      _arabicMessages[error.code] ??
+      _arabicMessages[ErrorCode.unexpected]!;
 
-  /// Central funnel: technical exception → typed AppError.
-  /// [cause] is kept for logging only — it must never reach the UI.
   static AppError map(Object error, {StackTrace? stackTrace}) {
     switch (error) {
       case AppError appError:
         return appError;
+
       case FirebaseAuthException authError:
         return AppError(
           switch (authError.code) {
             'invalid-email' => ErrorCode.invalidEmail,
             'weak-password' => ErrorCode.weakPassword,
             'email-already-in-use' => ErrorCode.emailInUse,
-            'wrong-password' || 'user-not-found' => ErrorCode.wrongCredentials,
+            'wrong-password' || 'user-not-found' || 'invalid-credential' =>
+              ErrorCode.wrongCredentials,
             'too-many-requests' => ErrorCode.tooManyAttempts,
             'user-disabled' => ErrorCode.userDisabled,
-            'invalid-credential' || 'requires-recent-login' => ErrorCode.requiresReauth,
+            'requires-recent-login' => ErrorCode.requiresReauth,
             'network-request-failed' => ErrorCode.network,
             _ => ErrorCode.unexpected,
           },
           cause: error,
           stackTrace: stackTrace,
         );
-      case FirebaseFirestoreException firestoreError:
+
+      case FirebaseException firebaseError:
+        final code = firebaseError.code ?? '';
+        final isFirestore = firebaseError.plugin == 'cloud_firestore';
+
+        if (!isFirestore) {
+          return AppError(
+            code == 'unavailable' || code == 'network-request-failed'
+                ? ErrorCode.firebaseUnavailable
+                : ErrorCode.unexpected,
+            cause: error,
+            stackTrace: stackTrace,
+          );
+        }
+
         return AppError(
-          switch (firestoreError.code) {
-            FirestoreErrorCode.permissionDenied => ErrorCode.permissionDenied,
-            FirestoreErrorCode.unavailable ||
-            FirestoreErrorCode.deadlineExceeded => ErrorCode.dbTimeout,
-            FirestoreErrorCode.failedPrecondition => ErrorCode.missingIndex,
-            FirestoreErrorCode.notFound => ErrorCode.notFound,
-            FirestoreErrorCode.alreadyExists ||
-            FirestoreErrorCode.aborted => ErrorCode.conflict,
-            FirestoreErrorCode.unauthenticated => ErrorCode.sessionExpired,
-            FirestoreErrorCode.invalidArgument => ErrorCode.invalidData,
+          switch (code) {
+            'permission-denied' => ErrorCode.permissionDenied,
+            'unavailable' || 'deadline-exceeded' => ErrorCode.dbTimeout,
+            'failed-precondition' => ErrorCode.missingIndex,
+            'not-found' => ErrorCode.notFound,
+            'already-exists' || 'aborted' => ErrorCode.conflict,
+            'unauthenticated' => ErrorCode.sessionExpired,
+            'invalid-argument' => ErrorCode.invalidData,
             _ => ErrorCode.unexpected,
           },
           cause: error,
           stackTrace: stackTrace,
         );
+
       case TimeoutException _:
         return AppError(
           ErrorCode.startupTimeout,
           cause: error,
           stackTrace: stackTrace,
         );
+
       case FormatException _:
         return AppError(
           ErrorCode.corruptedPrefs,
           cause: error,
           stackTrace: stackTrace,
         );
-      case _:
+
+      default:
         return AppError(
           ErrorCode.unexpected,
           cause: error,
@@ -214,9 +240,7 @@ class ErrorMapper {
   }
 }
 
-/// Exponential backoff with jitter — ONLY for idempotent operations.
-/// Callers pass [retryable]: false for non-idempotent work such as
-/// account deletion or invitation redemption.
+/// Exponential backoff with jitter for retryable operations.
 class RetryPolicy {
   const RetryPolicy({
     this.maxAttempts = 3,
@@ -226,17 +250,27 @@ class RetryPolicy {
   final int maxAttempts;
   final Duration baseDelay;
 
-  Future<T> run<T>(Future<T> Function() operation, {bool retryable = true}) async {
+  Future<T> run<T>(
+    Future<T> Function() operation, {
+    bool retryable = true,
+  }) async {
     var attempt = 0;
+
     while (true) {
       try {
         return await operation();
       } catch (error, stackTrace) {
-        final appError = ErrorMapper.map(error, stackTrace: stackTrace);
+        final appError = ErrorMapper.map(
+          error,
+          stackTrace: stackTrace,
+        );
+
         final canRetry = retryable &&
             attempt < maxAttempts &&
             appError.code.action == ErrorAction.retry;
+
         if (!canRetry) rethrow;
+
         attempt++;
         final jitter = Random().nextDouble() * 0.3 + 0.85;
         final delay = baseDelay * (pow(2, attempt) * jitter);
@@ -246,8 +280,7 @@ class RetryPolicy {
   }
 }
 
-/// Runs an async operation and ALWAYS invokes [onDone] in a finally block,
-/// so the UI can never stay stuck in a loading state.
+/// Always calls onDone, including when the operation fails.
 extension SafeAsync<T> on Future<T> {
   Future<void> safe({
     void Function(AppError error)? onError,
@@ -256,9 +289,11 @@ extension SafeAsync<T> on Future<T> {
   }) async {
     try {
       final value = await this;
-      await onSuccess?.call(value);
+      onSuccess?.call(value);
     } catch (error, stackTrace) {
-      onError?.call(ErrorMapper.map(error, stackTrace: stackTrace));
+      onError?.call(
+        ErrorMapper.map(error, stackTrace: stackTrace),
+      );
     } finally {
       await onDone();
     }
