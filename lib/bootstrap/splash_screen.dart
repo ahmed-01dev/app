@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -32,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _route() {
-    if (!mounted) return; // never navigate after dispose
+    if (!mounted) return;
     final state = _controller.state;
     if (state == StartupState.initializing) return;
     _controller.removeListener(_route);
@@ -56,16 +57,18 @@ class _SplashScreenState extends State<SplashScreen> {
           builder: (context, controller, _) => switch (controller.state) {
             StartupState.initializing ||
             StartupState.ready ||
-            StartupState.degraded => Center(
+            StartupState.degraded => const Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('فَجْر', style: FajrTheme.splashTitle),
-                  const SizedBox(height: 24),
-                  const SizedBox(
+                  Text('فَجْر', style: FajrTheme.splashTitle),
+                  SizedBox(height: 24),
+                  SizedBox(
                     width: 28,
                     height: 28,
-                    child: CircularProgressIndicator(color: FajrTheme.emerald),
+                    child: CircularProgressIndicator(
+                      color: FajrTheme.emerald,
+                    ),
                   ),
                 ],
               ),
@@ -76,7 +79,11 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.cloud_off, color: FajrTheme.gold, size: 48),
+                    const Icon(
+                      Icons.cloud_off,
+                      color: FajrTheme.gold,
+                      size: 48,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       controller.lastError == null
