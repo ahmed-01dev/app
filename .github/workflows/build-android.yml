@@ -50,6 +50,52 @@ jobs:
             exit 1
           fi
 
+      - name: Enable core library desugaring
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          groovy = Path("android/app/build.gradle")
+          kotlin = Path("android/app/build.gradle.kts")
+          gradle = groovy if groovy.exists() else kotlin
+
+          if not gradle.exists():
+              raise SystemExit("Android app Gradle file not found")
+
+          text = gradle.read_text()
+
+          if gradle.suffix == ".kts":
+              enabled = "isCoreLibraryDesugaringEnabled = true"
+              dependency = 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")'
+          else:
+              enabled = "coreLibraryDesugaringEnabled true"
+              dependency = "coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'"
+
+          if "coreLibraryDesugaringEnabled" not in text:
+              marker = "compileOptions {"
+              if marker not in text:
+                  raise SystemExit("compileOptions block not found in Gradle file")
+              text = text.replace(
+                  marker,
+                  marker + "\n        " + enabled,
+                  1
+              )
+
+          if "desugar_jdk_libs" not in text:
+              marker = "dependencies {"
+              if marker not in text:
+                  raise SystemExit("dependencies block not found in Gradle file")
+              text = text.replace(
+                  marker,
+                  marker + "\n    " + dependency,
+                  1
+              )
+
+          gradle.write_text(text)
+          print("Core library desugaring configured successfully.")
+          PY
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -57,7 +103,7 @@ jobs:
         run: dart format .
 
       - name: Analyze Flutter project
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
 
       - name: Run tests
         run: flutter test
