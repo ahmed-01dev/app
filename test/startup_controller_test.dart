@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fajr/bootstrap/startup_controller.dart';
@@ -14,7 +13,7 @@ void main() {
       await controller.start();
       stopwatch.stop();
 
-      // Hard bound: startup MUST terminate. This is the anti-infinite-splash test.
+      // Startup must terminate instead of leaving the splash screen indefinitely.
       expect(stopwatch.elapsed, lessThan(const Duration(seconds: 20)));
       expect(controller.state, isNot(StartupState.initializing));
       controller.dispose();
@@ -27,7 +26,7 @@ void main() {
     await controller.start();
     final stateAfterFirst = controller.state;
 
-    await controller.start(); // second call must not restart or change state
+    await controller.start();
     expect(controller.state, stateAfterFirst);
     controller.dispose();
   });
@@ -39,28 +38,31 @@ void main() {
 
     await controller.retry();
     expect(controller.state, isNot(StartupState.initializing));
-    // Deterministic: same environment ⇒ same outcome
     expect(controller.state, stateBefore);
     controller.dispose();
   });
 
-  test('no state change or crash after dispose (setState-after-dispose guard)',
+  test(
+    'no state change or crash after dispose (setState-after-dispose guard)',
+    () async {
+      final controller = StartupController();
+      controller.dispose();
+
+      // A late async result must not throw after dispose.
+      await controller.start();
+    },
+  );
+
+  test('missing Firebase config routes to degraded (demo), not failed',
       () async {
-    final controller = StartupController();
-    controller.dispose();
-
-    // A late async result must not throw after dispose.
-    await controller.start();
-  });
-
-  test('missing Firebase config routes to degraded (demo), not failed', () async {
-    // In this test environment Firebase.initializeApp throws because
-    // google-services.json / firebase_options.dart are absent —
-    // the controller must treat that as degraded local mode.
+    // Without Firebase configuration, startup should fall back to local mode.
     final controller = StartupController();
     await controller.start();
 
-    expect(controller.state, anyOf(StartupState.degraded, StartupState.ready));
+    expect(
+      controller.state,
+      anyOf(StartupState.degraded, StartupState.ready),
+    );
     expect(controller.isLocalMode, controller.state != StartupState.ready);
     controller.dispose();
   });
