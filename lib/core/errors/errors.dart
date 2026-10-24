@@ -3,7 +3,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 /// Typed application error. Raw exceptions are NEVER shown to users.
 class AppError implements Exception {
@@ -24,13 +23,10 @@ class AppError implements Exception {
 }
 
 enum ErrorCode {
-  // Startup & config
   startupTimeout,
   firebaseUnavailable,
   firebaseNotConfigured,
   corruptedPrefs,
-
-  // Auth
   invalidEmail,
   weakPassword,
   emailInUse,
@@ -41,16 +37,12 @@ enum ErrorCode {
   requiresReauth,
   network,
   authCancelled,
-
-  // Database
   permissionDenied,
   notFound,
   invalidData,
   missingIndex,
   dbTimeout,
   conflict,
-
-  // Business logic
   invalidInput,
   duplicateJoin,
   duplicateRequest,
@@ -60,15 +52,11 @@ enum ErrorCode {
   invalidPrayerTime,
   duplicateEvent,
   unauthorized,
-
-  // Platform
   notificationDenied,
   exactAlarmUnavailable,
   locationDenied,
   locationDisabled,
   dialerUnavailable,
-
-  // Fallback
   unexpected,
 }
 
@@ -175,7 +163,9 @@ class ErrorMapper {
             'invalid-email' => ErrorCode.invalidEmail,
             'weak-password' => ErrorCode.weakPassword,
             'email-already-in-use' => ErrorCode.emailInUse,
-            'wrong-password' || 'user-not-found' || 'invalid-credential' =>
+            'wrong-password' ||
+            'user-not-found' ||
+            'invalid-credential' =>
               ErrorCode.wrongCredentials,
             'too-many-requests' => ErrorCode.tooManyAttempts,
             'user-disabled' => ErrorCode.userDisabled,
@@ -188,7 +178,7 @@ class ErrorMapper {
         );
 
       case FirebaseException firebaseError:
-        final code = firebaseError.code ?? '';
+        final code = firebaseError.code;
         final isFirestore = firebaseError.plugin == 'cloud_firestore';
 
         if (!isFirestore) {
