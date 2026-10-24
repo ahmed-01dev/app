@@ -1,17 +1,18 @@
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/fajr_theme.dart';
 import '../adhkar/adhkar_screen.dart';
+import '../prayer/city_presets.dart';
 import '../prayer/prayer_times_screen.dart';
 
-/// Main navigation hub shown after a successful (or degraded) startup.
-/// Cloud-only features are DISABLED and clearly explained in demo mode —
-/// never fake buttons that pretend to work.
+/// Main navigation hub shown after startup.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.isLocalMode});
+  const HomeScreen({
+    super.key,
+    required this.isLocalMode,
+  });
 
-  /// True when running without Firebase — cloud features stay disabled
-  /// with a clear explanation, never fake success.
   final bool isLocalMode;
 
   @override
@@ -45,44 +46,53 @@ class HomeScreen extends StatelessWidget {
             icon: Icons.access_time,
             title: 'أوقات الصلاة',
             subtitle: 'حساب محلي على جهازك — اختر مدينتك',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const PrayerTimesScreen(onCitySelected: _noOp),
-              ),
-            ),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PrayerTimesScreen(
+                    onCitySelected: _onCitySelected,
+                  ),
+                ),
+              );
+            },
           ),
           _SectionCard(
             icon: Icons.menu_book,
             title: 'أذكار الصباح',
-            subtitle: 'أذكار موثقة بالمصادر — تعمل بدون إنترنت',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AdhkarScreen()),
-            ),
+            subtitle: 'أذكار تعمل بدون إنترنت',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AdhkarScreen(),
+                ),
+              );
+            },
           ),
           _SectionCard(
             icon: Icons.groups,
             title: 'الفرق',
             subtitle: isLocalMode
-                ? 'يتطلب Firebase — غير متاح في الوضع المحلي'
-                : 'انضم لفريق أو أنشئ فريقك الخاص (قريبًا)',
-            enabled: false, // teams screen lands in the next stage
+                ? 'يتطلب ربط Firebase'
+                : 'الميزة الاجتماعية قيد التطوير',
+            enabled: false,
             onTap: () {},
           ),
           _SectionCard(
             icon: Icons.person_search,
             title: 'رفيق الفجر',
             subtitle: isLocalMode
-                ? 'يتطلب Firebase — غير متاح في الوضع المحلي'
-                : 'اطلب من صاحبك أن يوقظك لصلاة الفجر (قريبًا)',
-            enabled: false, // companion screen lands in the next stage
+                ? 'يتطلب ربط Firebase'
+                : 'الميزة قيد التطوير',
+            enabled: false,
             onTap: () {},
           ),
           const SizedBox(height: 24),
           Text(
             isLocalMode
-                ? 'يعمل التطبيق الآن في الوضع المحلي التجريبي: أوقات الصلاة والأذكار متاحة، '
-                    'والميزات الاجتماعية تحتاج ربط Firebase (انظر README).'
-                : 'مرحبًا بك في فَجْر — كل الميزات متاحة.',
+                ? 'يعمل فَجْر حاليًا في الوضع المحلي. '
+                    'أوقات الصلاة والأذكار متاحة، '
+                    'أما الميزات الاجتماعية فتحتاج إلى إعداد Firebase.'
+                : 'مرحبًا بك في فَجْر.',
             style: FajrTheme.label,
             textAlign: TextAlign.center,
           ),
@@ -91,8 +101,10 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  /// Placeholder callback until the shell consumes the selected city.
-  static void _noOp(CityPreset city) {}
+  static void _onCitySelected(CityPreset city) {
+    // The selected city is saved by PrayerTimesScreen.
+    // The app shell can consume this callback in a later integration.
+  }
 }
 
 class _SectionCard extends StatelessWidget {
@@ -115,7 +127,10 @@ class _SectionCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: Icon(icon, color: enabled ? FajrTheme.gold : Colors.white30),
+        leading: Icon(
+          icon,
+          color: enabled ? FajrTheme.gold : Colors.white30,
+        ),
         title: Text(
           title,
           style: FajrTheme.headline.copyWith(
@@ -123,9 +138,15 @@ class _SectionCard extends StatelessWidget {
             color: enabled ? Colors.white : Colors.white38,
           ),
         ),
-        subtitle: Text(subtitle, style: FajrTheme.label),
+        subtitle: Text(
+          subtitle,
+          style: FajrTheme.label,
+        ),
         trailing: enabled
-            ? const Icon(Icons.chevron_left, color: Colors.white54)
+            ? const Icon(
+                Icons.chevron_left,
+                color: Colors.white54,
+              )
             : null,
         onTap: enabled ? onTap : null,
       ),
