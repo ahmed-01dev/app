@@ -24,7 +24,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: '3.35.7'
+          flutter-version: '3.47.8'
           cache: true
 
       - name: Show Flutter version
@@ -36,10 +36,17 @@ jobs:
           if [[ ! -f android/app/build.gradle && ! -f android/app/build.gradle.kts ]]; then
             echo "Generating Android platform files..."
             flutter create --platforms=android --org com.fajr --project-name fajr .
+          else
+            echo "Android platform files already exist."
           fi
 
           if [[ ! -f android/gradlew ]]; then
             echo "::error::Android Gradle wrapper was not generated."
+            exit 1
+          fi
+
+          if [[ ! -f android/app/build.gradle && ! -f android/app/build.gradle.kts ]]; then
+            echo "::error::Android app Gradle file is missing."
             exit 1
           fi
 
@@ -69,12 +76,15 @@ jobs:
 
           text = gradle.read_text()
 
-          if not re.search(r'coreLibraryDesugaringEnabled|isCoreLibraryDesugaringEnabled', text):
+          if not re.search(
+              r'coreLibraryDesugaringEnabled|isCoreLibraryDesugaringEnabled',
+              text,
+          ):
               pattern = r'compileOptions\s*\{'
               if re.search(pattern, text):
                   text = re.sub(
                       pattern,
-                      lambda m: m.group(0) + "\n        " + enabled,
+                      lambda match: match.group(0) + "\n        " + enabled,
                       text,
                       count=1,
                   )
@@ -86,7 +96,7 @@ jobs:
               if re.search(pattern, text):
                   text = re.sub(
                       pattern,
-                      lambda m: m.group(0) + "\n    " + dependency,
+                      lambda match: match.group(0) + "\n    " + dependency,
                       text,
                       count=1,
                   )
