@@ -1,3 +1,4 @@
+
 import 'package:adhan/adhan.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,15 +7,12 @@ import '../../core/errors/errors.dart';
 import '../../core/theme/fajr_theme.dart';
 import 'city_presets.dart';
 
-/// Prayer-times screen. Works fully OFFLINE:
-/// - City chosen manually from a built-in list (saved preference).
-/// - Times computed locally by the verified `adhan` package.
-/// - No invented times: without a selected city, the screen asks the user
-///   to pick one instead of showing made-up numbers.
 class PrayerTimesScreen extends StatefulWidget {
-  const PrayerTimesScreen({super.key, required this.onCitySelected});
+  const PrayerTimesScreen({
+    super.key,
+    required this.onCitySelected,
+  });
 
-  /// Notifies the app shell so other features can use the chosen city.
   final void Function(CityPreset city) onCitySelected;
 
   @override
@@ -23,6 +21,8 @@ class PrayerTimesScreen extends StatefulWidget {
 
 class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   CityPreset? _city;
+  bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -34,11 +34,23 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final name = prefs.getString('selected_city');
-      if (name == null) return;
-      final match = kCities.where((c) => c.name == name).firstOrNull;
-      if (match != null && mounted) setState(() => _city = match);
-    } on Exception {
-      // Corrupted prefs are non-fatal: user just re-picks the city.
+
+      if (!mounted) return;
+
+      final savedCity = name == null
+          ? null
+          : kCities.where((city) => city.name == name).firstOrNull;
+
+      setState(() {
+        _city = savedCity;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = 'تعذّر تحميل المدينة المحفوظة. اختر مدينتك من جديد.';
+      });
     }
   }
 
@@ -46,92 +58,147 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
     final picked = await showModalBottomSheet<CityPreset>(
       context: context,
       backgroundColor: FajrTheme.navyCard,
-      builder: (_) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: ListView(
+          shrinkWrap: true,
           children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'اختر مدينتك',
+                style: FajrTheme.headline,
+                textAlign: TextAlign.center,
+              ),
+            ),
             for (final city in kCities)
               ListTile(
-                title: Text(city.name, style: FajrTheme.body),
-                onTap: () => Navigator.of(context).pop(city),
+                title: Text(
+                  city.name,
+                  style: FajrTheme.body,
+                ),
+                onTap: () => Navigator.of(sheetContext).pop(city),
               ),
           ],
         ),
       ),
     );
-    if (picked == null) return; // user cancelled — no fake selection
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selected_city', picked.name);
-    widget.onCitySelected(picked);
-    if (mounted) setState(() => _city = picked);
+    if (picked == null || !mounted) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('selected_city', picked.name);
+
+      if (!mounted) return;
+
+      setState(() {
+        _city = picked;
+        _loadError = null;
+      });
+
+      widget.onCitySelected(picked);
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _loadError = 'تعذّر حفظ المدينة. حاول مرة أخرى.';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: FajrTheme.navyDeep,
-      appBar: AppBar(title: const Text('أوقات الصلاة')),
-      body: _city == null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.location_city,
-                        size: 48, color: FajrTheme.gold),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'اختر مدينتك لحساب أوقات الصلاة',
-                      style: FajrTheme.headline,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'الحساب يتم على جهازك بدون إنترنت، ولا نجمع موقعك.',
-                      style: FajrTheme.label,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _pickCity,
-                      child: const Text('اختيار المدينة'),
-                    ),
-                  ],
-                ),
+      appBar: AppBar(
+        title: const Text('أوقات الصلاة'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _city == null
+              ? _buildCityPrompt()
+              : _buildTimes(_city!),
+    );
+  }
+
+  Widget _buildCityPrompt() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.location_city,
+              size: 48,
+              color: FajrTheme.gold,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'اختر مدينتك لحساب أوقات الصلاة',
+              style: FajrTheme.headline,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'الحساب يتم على جهازك بدون إنترنت، '
+              'ولا نحتاج إلى جمع موقعك.',
+              style: FajrTheme.label,
+              textAlign: TextAlign.center,
+            ),
+            if (_loadError != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _loadError!,
+                style: FajrTheme.label,
+                textAlign: TextAlign.center,
               ),
-            )
-          : _buildTimes(_city!),
+            ],
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _pickCity,
+              child: const Text('اختيار المدينة'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildTimes(CityPreset city) {
     final PrayerTimes times;
+
     try {
-      times = PrayerTimes.today(
-        Coordinates(city.latitude, city.longitude),
-        CalculationMethod.muslimWorldLeague().parameters,
+      final coordinates = Coordinates(
+        city.latitude,
+        city.longitude,
       );
-    } on Exception {
-      // Computation failed (e.g. invalid coordinates) — never show
-      // invented times. Offer the manual fallback.
+
+      final parameters =
+          CalculationMethod.muslim_world_league.getParameters();
+
+      times = PrayerTimes.today(coordinates, parameters);
+    } catch (_) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              ErrorMapper.userMessage(
-                const AppError(ErrorCode.invalidPrayerTime),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                ErrorMapper.userMessage(
+                  const AppError(ErrorCode.invalidPrayerTime),
+                ),
+                style: FajrTheme.body,
+                textAlign: TextAlign.center,
               ),
-              style: FajrTheme.body,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: _pickCity,
-              child: const Text('اختيار مدينة أخرى'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: _pickCity,
+                child: const Text('اختيار مدينة أخرى'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -154,7 +221,12 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(city.name, style: FajrTheme.headline),
+                Flexible(
+                  child: Text(
+                    city.name,
+                    style: FajrTheme.headline,
+                  ),
+                ),
                 TextButton(
                   onPressed: _pickCity,
                   child: const Text('تغيير'),
@@ -167,11 +239,16 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
         for (final (name, time) in rows)
           Card(
             child: ListTile(
-              title: Text(name, style: FajrTheme.headline),
+              title: Text(
+                name,
+                style: FajrTheme.headline,
+              ),
               trailing: Text(
                 _format(time),
                 style: TextStyle(
-                  color: name == 'الفجر' ? FajrTheme.gold : Colors.white,
+                  color: name == 'الفجر'
+                      ? FajrTheme.gold
+                      : Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -179,8 +256,9 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
             ),
           ),
         const SizedBox(height: 16),
-        Text(
-          'طريقة الحساب: رابطة العالم الإسلامي — الحساب محلي على جهازك.',
+        const Text(
+          'طريقة الحساب: رابطة العالم الإسلامي. '
+          'قد تختلف الأوقات قليلًا عن الجداول المحلية المعتمدة.',
           style: FajrTheme.label,
           textAlign: TextAlign.center,
         ),
@@ -189,10 +267,11 @@ class _PrayerTimesScreenState extends State<PrayerTimesScreen> {
   }
 
   String _format(DateTime time) {
-    final h = time.hour;
-    final period = h >= 12 ? 'م' : 'ص';
-    final hour12 = h % 12 == 0 ? 12 : h % 12;
+    final hour = time.hour;
+    final period = hour >= 12 ? 'م' : 'ص';
+    final hour12 = hour % 12 == 0 ? 12 : hour % 12;
     final minute = time.minute.toString().padLeft(2, '0');
+
     return '$hour12:$minute $period';
   }
 }
